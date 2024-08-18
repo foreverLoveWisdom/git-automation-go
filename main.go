@@ -10,8 +10,14 @@ func main() {
 	// Get the current branch
 	originalBranch := getCurrentBranch()
 
-	fmt.Println("Enter a command: fetch, update, merge, or cleanup")
-	var command string
+	fmt.Println("Select a command:")
+	fmt.Println("1. Fetch")
+	fmt.Println("2. Update")
+	fmt.Println("3. Merge")
+	fmt.Println("4. Cleanup")
+	fmt.Print("Enter your choice (1-4): ")
+
+	var command int
 	_, err := fmt.Scanln(&command)
 
 	if err != nil {
@@ -21,13 +27,13 @@ func main() {
 
 	// Execute function based on user input
 	switch command {
-	case "fetch":
+	case 1:
 		fetchAll()
-	case "update":
+	case 2:
 		updateBranches()
-	case "merge":
+	case 3:
 		mergeMainIntoCurrent(originalBranch)
-	case "cleanup":
+	case 4:
 		cleanupBranches()
 	default:
 		fmt.Println("Invalid command")
@@ -63,9 +69,13 @@ func mergeMainIntoCurrent(originalBranch string) {
 
 // Cleanup old merged branches
 func cleanupBranches() {
-	branches := listLocalBranches()
-	oldBranches := filterOldBranches(branches)
-	confirmAndDelete(oldBranches)
+	branchesToDelete := deleteMergedLocalBranches()
+	// Return early if there are no branches to delete
+	if len(branchesToDelete) == 0 {
+		fmt.Println("No branches to delete. All merged branches are already cleaned up!")
+		return
+	}
+	confirmAndDelete(branchesToDelete)
 }
 
 // Utility functions
@@ -80,7 +90,42 @@ func getCurrentBranch() string {
 func listLocalBranches() []string {
 	output := runGitCommand("branch")
 	branches := strings.Split(output, "\n")
-	return branches
+
+	var cleanedBranches []string
+	for _, branch := range branches {
+		branch = strings.TrimSpace(branch)
+		if strings.HasPrefix(branch, "*") {
+			branch = strings.TrimPrefix(branch, "* ")
+		}
+		if branch != "" {
+			cleanedBranches = append(cleanedBranches, branch)
+		}
+	}
+	return cleanedBranches
+}
+
+// func isFullyMerged(branch string) bool {
+// 	output := runGitCommand("rev-list", "--no-walk", branch, "^main")
+// 	return output == ""
+// }
+
+func deleteMergedLocalBranches() []string {
+	runGitCommand("fetch", "--prune")
+
+	// List all branches merged into main
+	output := runGitCommand("branch", "--merged", "main")
+	branches := strings.Split(output, "\n")
+
+	var branchesToDelete []string
+	for _, branch := range branches {
+		branch = strings.TrimSpace(branch)
+		// Exclude the main branch and any other protected branches
+		if branch != "" && branch != "main" && branch != "qa" && branch != "* main" {
+			branchesToDelete = append(branchesToDelete, branch)
+		}
+	}
+
+	return branchesToDelete
 }
 
 // Filter out old branches and already merged
@@ -127,7 +172,17 @@ func runGitCommand(args ...string) string {
 	output, err := cmd.CombinedOutput()
 
 	if err != nil {
-		fmt.Printf("Error: %v\n", err)
+		exitErr, ok := err.(*exec.ExitError)
+		if ok {
+			if exitErr.ExitCode() == 128 {
+				fmt.Printf("Error running command: %v - likely a branch issue\n", err)
+			} else {
+				fmt.Printf("Error running command: %v\n", err)
+			}
+		} else {
+			fmt.Printf("Error: %v\n", err)
+		}
+		return ""
 	}
 
 	return string(output)
