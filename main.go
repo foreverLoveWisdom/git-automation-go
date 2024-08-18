@@ -11,11 +11,9 @@ func main() {
 	originalBranch := getCurrentBranch()
 
 	fmt.Println("Select a command:")
-	fmt.Println("1. Fetch")
-	fmt.Println("2. Update")
-	fmt.Println("3. Merge")
-	fmt.Println("4. Cleanup")
-	fmt.Print("Enter your choice (1-4): ")
+	fmt.Println("1. Sync with the Main Branch")
+	fmt.Println("2. Cleanup")
+	fmt.Print("Enter your choice (1-2): ")
 
 	var command int
 	_, err := fmt.Scanln(&command)
@@ -28,12 +26,8 @@ func main() {
 	// Execute function based on user input
 	switch command {
 	case 1:
-		fetchAll()
+		SyncWithMain(originalBranch)
 	case 2:
-		updateBranches()
-	case 3:
-		mergeMainIntoCurrent(originalBranch)
-	case 4:
 		cleanupBranches()
 	default:
 		fmt.Println("Invalid command")
@@ -42,31 +36,43 @@ func main() {
 
 // Core functionality
 
-// Fetch all remotes
-func fetchAll() {
+func SyncWithMain(originalBranch string) {
+	// Fetch all remotes
 	output := runGitCommand("fetch", "--all")
 	fmt.Println(output)
-}
 
-// Update main and QA branches
-func updateBranches() {
-	temp1 := runGitCommand("checkout", "main")
-	fmt.Println(temp1)
-	temp2 := runGitCommand("pull", "origin", "main")
-	fmt.Println(temp2)
+	// Whitelist of branches to update
+	branchesToUpdate := []string{"main", "qa"}
 
-	temp3 := runGitCommand("checkout", "qa")
+	// Loop through the whitelist and update each branch
+	for _, branch := range branchesToUpdate {
+		temp := runGitCommand("checkout", branch)
+		fmt.Println(temp)
+		temp = runGitCommand("pull", "origin", branch)
+		fmt.Println(temp)
+	}
+
+	// Check if we should merge into the current branch
+	blacklistedBranches := []string{"main", "qa", "production"} // Add any other branches as needed
+	if isBranchBlacklisted(originalBranch, blacklistedBranches) {
+		fmt.Printf("Merge operation aborted: Cannot merge 'main' into '%s'.\n", originalBranch)
+		return
+	}
+
+	// Merge main into the current branch
+	temp3 := runGitCommand("checkout", originalBranch)
 	fmt.Println(temp3)
-	temp4 := runGitCommand("pull", "origin", "qa")
+	temp4 := runGitCommand("merge", "main")
 	fmt.Println(temp4)
 }
 
-// Merge main into the original branch
-func mergeMainIntoCurrent(originalBranch string) {
-	temp1 := runGitCommand("checkout", originalBranch)
-	fmt.Println(temp1)
-	temp2 := runGitCommand("merge", "main")
-	fmt.Println(temp2)
+func isBranchBlacklisted(branch string, blacklistedBranches []string) bool {
+	for _, blacklistedBranch := range blacklistedBranches {
+		if branch == blacklistedBranch {
+			return true
+		}
+	}
+	return false
 }
 
 // Cleanup old merged branches
@@ -86,24 +92,6 @@ func cleanupBranches() {
 func getCurrentBranch() string {
 	output := runGitCommand("rev-parse", "--abbrev-ref", "HEAD")
 	return strings.TrimSpace(output)
-}
-
-// List local branches
-func listLocalBranches() []string {
-	output := runGitCommand("branch")
-	branches := strings.Split(output, "\n")
-
-	var cleanedBranches []string
-	for _, branch := range branches {
-		branch = strings.TrimSpace(branch)
-		if strings.HasPrefix(branch, "*") {
-			branch = strings.TrimPrefix(branch, "* ")
-		}
-		if branch != "" {
-			cleanedBranches = append(cleanedBranches, branch)
-		}
-	}
-	return cleanedBranches
 }
 
 // Delete merged local branches
