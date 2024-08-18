@@ -7,12 +7,12 @@ import (
 	"strings"
 )
 
-// GitCommander defines the interface for running Git commands
+// GitCommander defines the interface for running Git commands.
 type GitCommander interface {
 	RunGitCommand(args ...string) string
 }
 
-// BranchHandler defines the interface for branch-related operations
+// BranchHandler defines the interface for branch-related operations.
 type BranchHandler interface {
 	GetCurrentBranch() string
 	DeleteMergedLocalBranches() []string
@@ -24,12 +24,11 @@ type BranchHandler interface {
 
 type GitCommandExecutor struct{}
 
-// RunGitCommand executes a Git command and returns its output
+// RunGitCommand executes a Git command and returns its output.
 func (g GitCommandExecutor) RunGitCommand(args ...string) string {
 	cmd := exec.Command("git", args...)
 	fmt.Println("The command returned: ", cmd.String())
 	output, err := cmd.CombinedOutput()
-
 	if err != nil {
 		exitErr, ok := err.(*exec.ExitError)
 		if ok {
@@ -47,7 +46,7 @@ func (g GitCommandExecutor) RunGitCommand(args ...string) string {
 	return string(output)
 }
 
-// BranchManager handles branch operations using a GitCommander
+// BranchManager handles branch operations using a GitCommander.
 type BranchManager struct {
 	GitCmd GitCommander
 }
@@ -116,7 +115,7 @@ func (b BranchManager) CleanupBranches() {
 	confirmAndDelete(branchesToDelete)
 }
 
-// Confirm and delete old branches
+// Confirm and delete old branches.
 func confirmAndDelete(branches []string) {
 	fmt.Println("Branches to delete: ")
 	for _, branch := range branches {
@@ -124,6 +123,7 @@ func confirmAndDelete(branches []string) {
 	}
 
 	var input int
+
 	fmt.Println("Do you want to delete these branches?")
 	fmt.Println("1. Yes")
 	fmt.Println("2. No")
@@ -149,7 +149,6 @@ func runGitCommand(args ...string) string {
 	cmd := exec.Command("git", args...)
 	fmt.Println("The command returned: ", cmd.String())
 	output, err := cmd.CombinedOutput()
-
 	if err != nil {
 		var exitErr *exec.ExitError
 		if errors.As(err, &exitErr) {
@@ -167,7 +166,7 @@ func runGitCommand(args ...string) string {
 	return string(output)
 }
 
-// Helper function to check if the branch is blacklisted
+// Helper function to check if the branch is blacklisted.
 func isBranchBlacklisted(branch string, blacklistedBranches []string) bool {
 	for _, blacklistedBranch := range blacklistedBranches {
 		if branch == blacklistedBranch {
@@ -191,8 +190,8 @@ func main() {
 	fmt.Print("Enter your choice (1-2): ")
 
 	var command int
-	_, err := fmt.Scanln(&command)
 
+	_, err := fmt.Scanln(&command)
 	if err != nil {
 		fmt.Println("Error reading input:", err)
 		return
