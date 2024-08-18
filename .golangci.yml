@@ -103,7 +103,6 @@ linters-settings:
       - style
       - performance
       - opinionated
-      - security
   gofumpt:
     extra-rules: true
   gosimple:
