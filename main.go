@@ -1,44 +1,65 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os/exec"
 	"strings"
 )
 
-func main() {
-	// Get the current branch
-	originalBranch := getCurrentBranch()
-
-	fmt.Println("Select a command:")
-	fmt.Println("1. Sync with the Main Branch")
-	fmt.Println("2. Cleanup")
-	fmt.Print("Enter your choice (1-2): ")
-
-	var command int
-	_, err := fmt.Scanln(&command)
-
-	if err != nil {
-		fmt.Println("Error reading input:", err)
-		return
-	}
-
-	// Execute function based on user input
-	switch command {
-	case 1:
-		SyncWithMain(originalBranch)
-	case 2:
-		cleanupBranches()
-	default:
-		fmt.Println("Invalid command")
-	}
+// GitCommander defines the interface for running Git commands
+type GitCommander interface {
+	RunGitCommand(args ...string) string
 }
 
-// Core functionality
+// BranchHandler defines the interface for branch-related operations
+type BranchHandler interface {
+	GetCurrentBranch() string
+	DeleteMergedLocalBranches() []string
+	SyncWithMain(originalBranch string)
+	CleanupBranches()
+}
 
-func SyncWithMain(originalBranch string) {
+// Core functionality implementation
+
+type GitCommandExecutor struct{}
+
+// RunGitCommand executes a Git command and returns its output
+func (g GitCommandExecutor) RunGitCommand(args ...string) string {
+	cmd := exec.Command("git", args...)
+	fmt.Println("The command returned: ", cmd.String())
+	output, err := cmd.CombinedOutput()
+
+	if err != nil {
+		exitErr, ok := err.(*exec.ExitError)
+		if ok {
+			if exitErr.ExitCode() == 128 {
+				fmt.Printf("Error running command: %v - likely a branch issue\n", err)
+			} else {
+				fmt.Printf("Error running command: %v\n", err)
+			}
+		} else {
+			fmt.Printf("Error: %v\n", err)
+		}
+		return ""
+	}
+
+	return string(output)
+}
+
+// BranchManager handles branch operations using a GitCommander
+type BranchManager struct {
+	GitCmd GitCommander
+}
+
+func (b BranchManager) GetCurrentBranch() string {
+	output := b.GitCmd.RunGitCommand("rev-parse", "--abbrev-ref", "HEAD")
+	return strings.TrimSpace(output)
+}
+
+func (b BranchManager) SyncWithMain(originalBranch string) {
 	// Fetch all remotes
-	output := runGitCommand("fetch", "--all")
+	output := b.GitCmd.RunGitCommand("fetch", "--all")
 	fmt.Println(output)
 
 	// Whitelist of branches to update
@@ -46,9 +67,9 @@ func SyncWithMain(originalBranch string) {
 
 	// Loop through the whitelist and update each branch
 	for _, branch := range branchesToUpdate {
-		temp := runGitCommand("checkout", branch)
+		temp := b.GitCmd.RunGitCommand("checkout", branch)
 		fmt.Println(temp)
-		temp = runGitCommand("pull", "origin", branch)
+		temp = b.GitCmd.RunGitCommand("pull", "origin", branch)
 		fmt.Println(temp)
 	}
 
@@ -60,46 +81,17 @@ func SyncWithMain(originalBranch string) {
 	}
 
 	// Merge main into the current branch
-	temp3 := runGitCommand("checkout", originalBranch)
-	fmt.Println(temp3)
-	temp4 := runGitCommand("merge", "main")
-	fmt.Println(temp4)
+	temp := b.GitCmd.RunGitCommand("checkout", originalBranch)
+	fmt.Println(temp)
+	temp = b.GitCmd.RunGitCommand("merge", "main")
+	fmt.Println(temp)
 }
 
-func isBranchBlacklisted(branch string, blacklistedBranches []string) bool {
-	for _, blacklistedBranch := range blacklistedBranches {
-		if branch == blacklistedBranch {
-			return true
-		}
-	}
-	return false
-}
-
-// Cleanup old merged branches
-func cleanupBranches() {
-	branchesToDelete := deleteMergedLocalBranches()
-	// Return early if there are no branches to delete
-	if len(branchesToDelete) == 0 {
-		fmt.Println("No branches to delete. All merged branches are already cleaned up!")
-		return
-	}
-	confirmAndDelete(branchesToDelete)
-}
-
-// Helper functions
-
-// Get the current branch name
-func getCurrentBranch() string {
-	output := runGitCommand("rev-parse", "--abbrev-ref", "HEAD")
-	return strings.TrimSpace(output)
-}
-
-// Delete merged local branches
-func deleteMergedLocalBranches() []string {
-	runGitCommand("fetch", "--prune")
+func (b BranchManager) DeleteMergedLocalBranches() []string {
+	b.GitCmd.RunGitCommand("fetch", "--prune")
 
 	// List all branches merged into main
-	output := runGitCommand("branch", "--merged", "main")
+	output := b.GitCmd.RunGitCommand("branch", "--merged", "main")
 	branches := strings.Split(output, "\n")
 
 	var branchesToDelete []string
@@ -112,6 +104,16 @@ func deleteMergedLocalBranches() []string {
 	}
 
 	return branchesToDelete
+}
+
+func (b BranchManager) CleanupBranches() {
+	branchesToDelete := b.DeleteMergedLocalBranches()
+	// Return early if there are no branches to delete
+	if len(branchesToDelete) == 0 {
+		fmt.Println("No branches to delete. All merged branches are already cleaned up!")
+		return
+	}
+	confirmAndDelete(branchesToDelete)
 }
 
 // Confirm and delete old branches
@@ -143,15 +145,14 @@ func confirmAndDelete(branches []string) {
 	}
 }
 
-// Run a Git command and return its output
 func runGitCommand(args ...string) string {
 	cmd := exec.Command("git", args...)
 	fmt.Println("The command returned: ", cmd.String())
 	output, err := cmd.CombinedOutput()
 
 	if err != nil {
-		exitErr, ok := err.(*exec.ExitError)
-		if ok {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
 			if exitErr.ExitCode() == 128 {
 				fmt.Printf("Error running command: %v - likely a branch issue\n", err)
 			} else {
@@ -164,4 +165,46 @@ func runGitCommand(args ...string) string {
 	}
 
 	return string(output)
+}
+
+// Helper function to check if the branch is blacklisted
+func isBranchBlacklisted(branch string, blacklistedBranches []string) bool {
+	for _, blacklistedBranch := range blacklistedBranches {
+		if branch == blacklistedBranch {
+			return true
+		}
+	}
+	return false
+}
+
+func main() {
+	// Initialize the GitCommandExecutor and BranchManager
+	gitExecutor := GitCommandExecutor{}
+	branchManager := BranchManager{GitCmd: gitExecutor}
+
+	// Get the current branch
+	originalBranch := branchManager.GetCurrentBranch()
+
+	fmt.Println("Select a command:")
+	fmt.Println("1. Sync with the Main Branch")
+	fmt.Println("2. Cleanup")
+	fmt.Print("Enter your choice (1-2): ")
+
+	var command int
+	_, err := fmt.Scanln(&command)
+
+	if err != nil {
+		fmt.Println("Error reading input:", err)
+		return
+	}
+
+	// Execute function based on user input
+	switch command {
+	case 1:
+		branchManager.SyncWithMain(originalBranch)
+	case 2:
+		branchManager.CleanupBranches()
+	default:
+		fmt.Println("Invalid command")
+	}
 }
