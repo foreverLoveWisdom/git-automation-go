@@ -40,6 +40,8 @@ func main() {
 	}
 }
 
+// Core functionality
+
 // Fetch all remotes
 func fetchAll() {
 	output := runGitCommand("fetch", "--all")
@@ -78,7 +80,7 @@ func cleanupBranches() {
 	confirmAndDelete(branchesToDelete)
 }
 
-// Utility functions
+// Helper functions
 
 // Get the current branch name
 func getCurrentBranch() string {
@@ -104,11 +106,7 @@ func listLocalBranches() []string {
 	return cleanedBranches
 }
 
-// func isFullyMerged(branch string) bool {
-// 	output := runGitCommand("rev-list", "--no-walk", branch, "^main")
-// 	return output == ""
-// }
-
+// Delete merged local branches
 func deleteMergedLocalBranches() []string {
 	runGitCommand("fetch", "--prune")
 
@@ -128,17 +126,6 @@ func deleteMergedLocalBranches() []string {
 	return branchesToDelete
 }
 
-// Filter out old branches and already merged
-func filterOldBranches(branches []string) []string {
-	var filteredBranches []string
-	for _, branch := range branches {
-		if branch != "main" && branch != "qa" && !strings.Contains(branch, "*") {
-			filteredBranches = append(filteredBranches, branch)
-		}
-	}
-	return filteredBranches
-}
-
 // Confirm and delete old branches
 func confirmAndDelete(branches []string) {
 	fmt.Println("Branches to delete: ")
@@ -146,16 +133,19 @@ func confirmAndDelete(branches []string) {
 		fmt.Println(branch)
 	}
 
-	var input string
-	fmt.Print("Do you wanna delete these branches? (y/n): ")
+	var input int
+	fmt.Println("Do you want to delete these branches?")
+	fmt.Println("1. Yes")
+	fmt.Println("2. No")
+	fmt.Print("Enter your choice (1 or 2): ")
 	_, err := fmt.Scanln(&input)
 
-	if err != nil {
-		fmt.Println("Error reading input:", err)
+	if err != nil || (input != 1 && input != 2) {
+		fmt.Println("Invalid input. Please enter 1 for Yes or 2 for No.")
 		return
 	}
 
-	if input == "y" {
+	if input == 1 {
 		for _, branch := range branches {
 			runGitCommand("branch", "-D", branch)
 		}
