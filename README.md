@@ -4,10 +4,8 @@
 
 This is a simple CLI tool built in Go to automate common Git tasks. The tool allows you to:
 
-- Fetch all remotes.
-- Update the `main` and `qa` branches.
-- Merge the `main` branch into your current branch.
-- Clean up old local branches.
+- Sync your current branch with the `main` branch.
+- Clean up old local branches that have been merged into `main`.
 
 This tool is designed to be run from within any Git project directory and can be executed globally on macOS.
 
@@ -63,10 +61,10 @@ This tool is designed to be run from within any Git project directory and can be
      ```
 
    - The program will prompt you to enter a command. You can choose from the following options:
-     - `fetch`: Fetch all remotes
-     - `update`: Update `main` and `qa` branches.
-     - `merge`: Merge `main` into the current branch.
-     - `cleanup`: Delete old local branches.
+     - `1`: Sync with the `main` branch
+     - `2`: Clean up old local branches
+
+- Note: Before running the script, ensure that your current branch is clean (i.e., no uncommitted changes or untracked files). This is important because there are still improvements to be made, and the script might otherwise cause issues if the working directory is not clean.
 
 ## Example Usage
 
@@ -77,34 +75,23 @@ git-automation
 
 **Example Commands**:
 
-- To fetch all remotes:
+- To sync your current branch with the `main` branch:
 
   ```bash
-  fetch
+  1
   ```
 
-- To update `main` and `qa` branches:
+- To clean up old local branches:
 
   ```bash
-  update
-  ```
-
-- To merge `main` into the current branch:
-
-  ```bash
-  merge
-  ```
-
-- To clean up old branches:
-
-  ```bash
-  cleanup
+  2
   ```
 
 ## Notes
 
 - You must run this tool from within a Git project directory.
 - Ensure that the `git-automation` executable is in your `PATH` for global access.
+- The tool is designed to avoid merging `main` into protected branches such as `main`, `qa`, and `production`.
 
 ## Troubleshooting
 
@@ -115,3 +102,7 @@ chmod +x /usr/local/bin/git-automation
 ```
 
 - This simple setup allows you to efficiently manage your Git workflow across different projects, with the convenience of a globally accessible command-line tool.
+
+## License
+
+- This project is licensed under the MIT License - see the [LICENSE](https://github.com/foreverLoveWisdom/git-automation-go/blob/main/LICENSE) file for details.
